@@ -22,13 +22,9 @@ void main() {
 
     // Define a cor final baseada na lógica
     vec4 color;
-    if(isInsideFill == 1.0) {
-        color = v_fillColor;
-    } else if(isInsideStroke == 1.0) {
-        color = v_strokeColor;
-    } else {
-        discard; // Fora do círculo, não pinta nada
-    }
+    if(isInsideFill == 1.0) color = v_fillColor;
+    else if(isInsideStroke == 1.0) color = v_strokeColor;
+    else discard; // Fora do círculo, não pinta nada
 
     gl_FragColor = color;
 }

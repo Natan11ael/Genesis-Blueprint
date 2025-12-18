@@ -1,82 +1,17 @@
 /// CanvasJS.js
 //
-/// Shader Sources
-const vShaderSrc = `
-/// vShaderSrc.glsl
-//
-precision mediump float;
+/// Load Shader
+function loadShader(url) {
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', url, false);
+    xhr.send(null);
 
-attribute vec2 a_position;
-attribute vec2 a_pos;        // Posição central do círculo (pixels)
-attribute float a_radius;    // Raio do círculo (pixels)
-attribute vec4 a_fillColor;
-attribute vec4 a_strokeColor;
-attribute float a_strokeWidth;
-
-uniform vec2 u_resolution; // Tamanho do canvas (largura, altura)
-
-varying vec2 v_uv;           // Passa a coordenada local para o Fragment Shader
-varying float v_radius;      // DEVE ser declarado aqui
-varying vec4 v_fillColor;    //
-varying vec4 v_strokeColor;  //
-varying float v_strokeWidth; // DEVE ser declarado aqui
-
-void main() {
-  // Calcula o tamanho total necessário (raio + borda)
-  float totalSize = a_radius + a_strokeWidth;
-
-  // Mapeia os pontos do buffer para o tamanho e posição corretos
-  vec2 realPos = a_position * totalSize + a_pos;
-
-  // Converte pixels para o espaço do WebGL (-1.0 a 1.0)
-  vec2 zeroToTwo = (realPos / u_resolution) * 2.0;
-  vec2 clipSpace = zeroToTwo - 1.0;
-
-  gl_Position = vec4(clipSpace * vec2(1, -1), 0, 1); // Inverte Y para o topo ser 0
-  v_uv = a_position;             // Coordenada de -1.0 a 1.0
-  v_radius = a_radius;           // Passando para o fragment shader
-  v_fillColor = a_fillColor;     // Passando para o fragment shader
-  v_strokeColor = a_strokeColor;
-  v_strokeWidth = a_strokeWidth; // Passando para o fragment shader
-}
-`;
-//
-const fShaderSrc = `
-/// fShaderSrc.glsl
-//
-precision mediump float;
-
-varying vec2 v_uv;
-varying float v_radius;
-varying vec4 v_fillColor;
-varying vec4 v_strokeColor;
-varying float v_strokeWidth;
-
-void main() {
-    float dist = length(v_uv);
-
-    // Define os limites das áreas (tudo ou nada, sem suavização)
-    float innerLimit = (v_radius - v_strokeWidth) / v_radius;
-    float outerLimit = 1.0; // Fim do 'quadrado' de desenho
-
-    // Usa 'step' para decidir a cor de forma binária
-    // step(borda_dura, valor_atual): retorna 0.0 ou 1.0
-    float isInsideFill = step(dist, innerLimit);
-    float isInsideStroke = step(dist, outerLimit);
-
-    // Define a cor final baseada na lógica
-    vec4 color;
-    if(isInsideFill == 1.0) {
-        color = v_fillColor;
-    } else if(isInsideStroke == 1.0) {
-        color = v_strokeColor;
+    if (xhr.status === 200) {
+        return xhr.responseText;
     } else {
-        discard; // Fora do círculo, não pinta nada
+        throw new Error(`Falha ao carregar shader: ${url}`);
     }
-
-    gl_FragColor = color;
 }
-`;
 //
 /// Program Creation
 function program(gl, vSrc, fSrc) {
@@ -102,13 +37,6 @@ function program(gl, vSrc, fSrc) {
 }
 //
 /// Hex to RGBA
-function HexToRGBA(hex) {
-    const r = ((hex >>> 24) & 0xFF) / 255;
-    const g = ((hex >>> 16) & 0xFF) / 255;
-    const b = ((hex >>> 8) & 0xFF) / 255;
-    const a = (hex & 0xFF) / 255;
-    return [r, g, b, a];
-}
 //
 /// Class Definition
 class CanvasJS extends HTMLCanvasElement {
@@ -127,6 +55,9 @@ class CanvasJS extends HTMLCanvasElement {
         this.ctx.clearColor(0.0, 0.0, 0.0, 1.0);
         this.ctx.enable(this.ctx.BLEND);
         this.ctx.blendFunc(this.ctx.SRC_ALPHA, this.ctx.ONE_MINUS_SRC_ALPHA, this.ctx.ONE, this.ctx.ONE_MINUS_SRC_ALPHA);
+
+        const vShaderSrc = loadShader('./src/vShaderSrc.glsl');
+        const fShaderSrc = loadShader('./src/fShaderSrc.glsl');
 
         // Create and use program
         const prog = program(this.ctx, vShaderSrc, fShaderSrc);
@@ -153,8 +84,8 @@ class CanvasJS extends HTMLCanvasElement {
         this.instanceBuffer = this.ctx.createBuffer();
         this.ctx.bindBuffer(this.ctx.ARRAY_BUFFER, this.instanceBuffer);
 
-        // Definimos o layout dos dados: [x, y, radius, strokeWidth, r, g, b, a...]
-        const stride = 48; // 12 floats = 32 bytes por partícula
+        //
+        const stride = 24;
 
         // Atributo: a_pos (vec2)
         const a_posLoc = this.ctx.getAttribLocation(prog, "a_pos");
@@ -177,23 +108,23 @@ class CanvasJS extends HTMLCanvasElement {
         // Atributo: a_fillColor (vec4)
         const a_fillLoc = this.ctx.getAttribLocation(prog, "a_fillColor");
         this.ctx.enableVertexAttribArray(a_fillLoc);
-        this.ctx.vertexAttribPointer(a_fillLoc, 4, this.ctx.FLOAT, false, stride, 16); // offset 16
+        this.ctx.vertexAttribPointer(a_fillLoc, 4, this.ctx.UNSIGNED_BYTE, true, stride, 16); // offset 16
         this.ext.vertexAttribDivisorANGLE(a_fillLoc, 1);
 
         const a_strkCLoc = this.ctx.getAttribLocation(prog, "a_strokeColor");
         this.ctx.enableVertexAttribArray(a_strkCLoc);
-        this.ctx.vertexAttribPointer(a_strkCLoc, 4, this.ctx.FLOAT, false, stride, 32); // Offset 32
+        this.ctx.vertexAttribPointer(a_strkCLoc, 4, this.ctx.UNSIGNED_BYTE, true, stride, 20); // Offset 32
         this.ext.vertexAttribDivisorANGLE(a_strkCLoc, 1);
-
-        // Get uniform locations (apenas os que não mudam por partícula)
-        this.locs = {
-            res: this.ctx.getUniformLocation(prog, "u_resolution")
-        };
 
         // Get uniform locations
         this.locs = {
             res: this.ctx.getUniformLocation(prog, "u_resolution"),
         };
+
+        // Make Buffers
+        this.bufferData = new Float32Array(50000 * 6);
+        this.uint32Data = new Uint32Array(this.bufferData.buffer);
+        this.init = false;
 
         /// Time properties
         this.timers = new Map();
@@ -213,7 +144,12 @@ class CanvasJS extends HTMLCanvasElement {
 
     // Set background color
     set background(color) {
-        this.ctx.clearColor(...HexToRGBA(color));
+        this.ctx.clearColor(...[
+            ((color >> 24) & 0xFF) / 255, // R
+            ((color >> 16) & 0xFF) / 255, // G
+            ((color >> 8) & 0xFF) / 255, // B
+            (color & 0xFF) / 255  // A
+        ]);
     }
 
     // 
@@ -230,53 +166,45 @@ class CanvasJS extends HTMLCanvasElement {
         this.timers.set(id, currentTime);
     }
 
-    // Darw particles
-    renderBatch(particles) {
-        if (particles.length === 0) return;
+    // 1. Update Buffers
+    updateBuffer(count) {
+        const requiredLength = count * 6;
+        const isOverflow = requiredLength > this.bufferData.length;
 
-        // 12 floats por partícula: [x, y, radius, strokeW, r,g,b,a (fill), r,g,b,a (stroke)]
-        const data = new Float32Array(particles.length * 12);
-
-        for (let i = 0; i < particles.length; i++) {
-            const p = particles[i];
-            const offset = i * 12;
-
-            // Conversão de cores (CPU side)
-            const fCol = HexToRGBA(p.fill);
-            const sCol = HexToRGBA(p.stroke.color);
-
-            // Dados Espaciais
-            data[offset] = p.pos.x;
-            data[offset + 1] = p.pos.y;
-            data[offset + 2] = p.radius;
-
-            // Note: usei 'lenght' pois é como está no seu constructor de Particle
-            data[offset + 3] = p.stroke.length;
-
-            // Fill Color (Varying v_fillColor)
-            data[offset + 4] = fCol[0];
-            data[offset + 5] = fCol[1];
-            data[offset + 6] = fCol[2];
-            data[offset + 7] = fCol[3];
-
-            // Stroke Color (Varying v_strokeColor)
-            data[offset + 8] = sCol[0];
-            data[offset + 9] = sCol[1];
-            data[offset + 10] = sCol[2];
-            data[offset + 11] = sCol[3];
+        if (isOverflow) {
+            const newSize = Math.ceil(requiredLength * 1.5);
+            this.bufferData = new Float32Array(newSize);
+            this.uint32Data = new Uint32Array(this.bufferData.buffer);
         }
-
-        // Bind e Upload para a GPU
-        this.ctx.bindBuffer(this.ctx.ARRAY_BUFFER, this.instanceBuffer);
-        this.ctx.bufferData(this.ctx.ARRAY_BUFFER, data, this.ctx.DYNAMIC_DRAW);
-
-        // Atualiza a resolução (uniform) apenas uma vez por frame
-        this.ctx.uniform2f(this.locs.res, this.width, this.height);
-
-        // Chamada de Instanciamento
-        this.ext.drawArraysInstancedANGLE(this.ctx.TRIANGLES, 0, 6, particles.length);
+        return isOverflow;
     }
 
+    // 2. W (CPU)
+    updateVertexData(id, _) {
+        // Set Data
+        const offset = id * 6;
+        this.bufferData[offset] = _.motion[0];       // x
+        this.bufferData[offset + 1] = _.motion[1];   // y
+        this.bufferData[offset + 2] = _.physical[3]; // radius/size
+        this.bufferData[offset + 3] = _.style[2];    // strokeThickness
+        this.uint32Data[offset + 4] = _.style[0];    // fill color
+        this.uint32Data[offset + 5] = _.style[1];    // stroke color
+    }
+
+    // 3. R (GPU)
+    dispatchDraw(count, isOverflow) {
+        //
+        this.ctx.bindBuffer(this.ctx.ARRAY_BUFFER, this.instanceBuffer);
+        if (isOverflow || !this.init) {
+            this.ctx.bufferData(this.ctx.ARRAY_BUFFER, this.bufferData, this.ctx.DYNAMIC_DRAW);
+            this.init = true;
+        }
+        else this.ctx.bufferSubData(this.ctx.ARRAY_BUFFER, 0, this.bufferData.subarray(0, count * 6));
+
+        //
+        this.ctx.uniform2f(this.locs.res, this.width, this.height);
+        this.ext.drawArraysInstancedANGLE(this.ctx.TRIANGLES, 0, 6, count);
+    }
 
     // Resize Canvas
     resize() {
@@ -292,7 +220,7 @@ class CanvasJS extends HTMLCanvasElement {
 
         // Update time
         this.deltaTime = this.lastTime ? (time - this.lastTime) / 1000 : 0.016;
-        canvas.countdown('fps', .1, () => { this.fps = this.deltaTime > 0 ? 1 / this.deltaTime : 0});
+        canvas.countdown('fps', .1, () => { this.fps = this.deltaTime > 0 ? 1 / this.deltaTime : 0 });
         this.lastTime = time;
 
         // Logic and Render
@@ -303,5 +231,4 @@ class CanvasJS extends HTMLCanvasElement {
 
 };
 customElements.define('canvas-js', CanvasJS, { extends: 'canvas' }); // Extend HTMLCanvasElement
-//
 //
