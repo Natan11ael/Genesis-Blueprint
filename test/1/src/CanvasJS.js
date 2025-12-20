@@ -179,19 +179,7 @@ class CanvasJS extends HTMLCanvasElement {
         return isOverflow;
     }
 
-    // 2. W (CPU)
-    updateVertexData(id, _) {
-        // Set Data
-        const offset = id * 6;
-        this.bufferData[offset] = _.motion[0];       // x
-        this.bufferData[offset + 1] = _.motion[1];   // y
-        this.bufferData[offset + 2] = _.physical[3]; // radius/size
-        this.bufferData[offset + 3] = _.style[2];    // strokeThickness
-        this.uint32Data[offset + 4] = _.style[0];    // fill color
-        this.uint32Data[offset + 5] = _.style[1];    // stroke color
-    }
-
-    // 3. R (GPU)
+    // 2. Rrender (GPU)
     dispatchDraw(count, isOverflow) {
         //
         this.ctx.bindBuffer(this.ctx.ARRAY_BUFFER, this.instanceBuffer);

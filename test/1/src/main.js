@@ -9,45 +9,37 @@ canvas.background = 0x5293e2e2;
 const st = document.getElementById('status');
 //
 // Particle System
-let particles = [];
-let particlesView = [];
+let particles = new ParticleSystem(50000);
 //
 /// Update Function
 //
 canvas.main = function () {
     /// Updates
     //
-    if (particles.length < 60000) Array.from({ length: 100 }).forEach(() => {
-        particles.push(new Particle({
-            pos: { x: canvas.width / 2, y: canvas.height / 2 },
+    if (particles.count < particles.length) Array.from({ length: 100 }).forEach(() => {
+        particles.push({
+            x: canvas.width / 2, 
+            y: canvas.height / 2,
             speed: { x: random({ min: -20, max: 20, type: 'f' }), y: random({ min: -20, max: 20, type: 'f' }) },
-            radius: random({ min: 3, max: 6 }),
+            radius: random({ min: 3, max: 5 }),
             fill: random({ type: 'h' }),
             stroke: {
                 length: 1,
                 color: random({ type: 'h' }),
             }
-        }))
-    });
-    const len = particles.length;
-    let lenView = 0;
-
-    let isOverflow = canvas.updateBuffer(len)
-    particles.update((_) => {
-        _.update(this.deltaTime);
-
-        if (_.motion[0] > 0 - _.physical[3] && _.motion[0] < canvas.width + _.physical[3] &&
-            _.motion[1] > 0 - _.physical[3] && _.motion[1] < canvas.height + _.physical[3]) {
-            canvas.updateVertexData(lenView, _);
-            lenView++;
-        }
+        })
     });
 
-    st.textContent = `FPS: ${canvas.fps.toFixed(2)} Particles: ${lenView}/${len}`;
+    const isOverflow = canvas.updateBuffer(particles.length)
+    const [f32, u32] = particles.update(canvas);
+    canvas.bufferData.set(f32);
+    canvas.uint32Data.set(u32);
+
+    st.textContent = `FPS: ${canvas.fps.toFixed(2)} Particles: ${f32.length/6}/${particles.count}`;
 
     /// Renderings
     //
-    canvas.dispatchDraw(lenView, isOverflow);
+    canvas.dispatchDraw(f32.length/6, isOverflow);
 };
 //
 /// Start the loop

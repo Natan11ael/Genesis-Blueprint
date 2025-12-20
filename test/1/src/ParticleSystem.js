@@ -1,7 +1,4 @@
-/// Testing Class Otimization
-const inicial = process.memoryUsage().heapUsed;
-
-/// Gerenciador de Particulas
+/// ParticleSystem.js
 //
 class ParticleSystem {
     constructor(length) {
@@ -34,7 +31,7 @@ class ParticleSystem {
     // Redimenciona Buffers
     resize() {
         // 1. Calcula o novo tamanho (dobra ou cresce 50%)
-        const newLength = Math.floor(this.length * (this.length > 1024 ? 1.5 : 2));
+        const newLength = Math.floor(this.length * 2);
 
         // 2. Cria um novo Buffer com o novo tamanho total (partículas * slots * 4 bytes)
         const newBuffer = new ArrayBuffer(newLength * this.stride * 4);
@@ -116,25 +113,3 @@ class ParticleSystem {
         return [this._f32.subarray(0, destOffset), this._u32.subarray(0, destOffset)];
     }
 }
-
-/// Simulando 1 frame
-const particles = new ParticleSystem(50000); // geran 0 particulas && Grenciador de Particulas
-const canvas = {deltaTime:.0016, width:100, height:100};
-
-// Warm-up (Aquece o motor V8)
-particles.update(() => null);
-
-// Medição com alta precisão
-const start = performance.now();
-
-particles.push({ x: 1 });
-const data = particles.update(canvas);
-
-const end = performance.now(); // ~.3 ms/-
-
-console.log(`[time]: ${(end - start).toFixed(2)} ms`);
-console.log(`[memory]: ${((process.memoryUsage().heapUsed - inicial) / 10000).toFixed(1)} bytes`);
-console.log(`[count]: ${particles.count}/${particles.length}`);
-
-// <50k | -14.ms |
-//  50k | ~14.ms | ~1.0 bytes | +/-Complexo

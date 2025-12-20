@@ -34,6 +34,9 @@ app.get('/0', (req, res) => {
 app.get('/1', (req, res) => {
     res.sendFile(path.join(__dirname, 'views', '1/index.html'));
 });
+app.get('/2', (req, res) => {
+    res.sendFile(path.join(__dirname, 'views', '2/index.html'));
+});
 
 /// erros-routes
 //
