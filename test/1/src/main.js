@@ -33,7 +33,7 @@ canvas.main = function () {
     let lenView = 0;
 
     let isOverflow = canvas.updateBuffer(len)
-    particles.forEach((_) => {
+    particles.update((_) => {
         _.update(this.deltaTime);
 
         if (_.motion[0] > 0 - _.physical[3] && _.motion[0] < canvas.width + _.physical[3] &&

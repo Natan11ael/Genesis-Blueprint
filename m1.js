@@ -120,6 +120,5 @@ console.log(`[time]: ${(end - start).toFixed(2)} ms`);
 console.log(`[memory]: ${((process.memoryUsage().heapUsed - inicial) / 10000).toFixed(1)} bytes`);
 console.log(`[count]: ${particles.count}/${particles.length}`);
 
-
 // <10k | -20.ms |
 //  10k | ~20.ms | ~1.5 bytes | -Complexo
