@@ -152,8 +152,8 @@ class CanvasJS extends HTMLCanvasElement {
         this.locs = { res: this.ctx.getUniformLocation(prog, "u_resolution") };
 
         // Make Buffers
-        this.f32 = new Float32Array(50000 * 6);
-        this.u32 = new Uint32Array(this.f32.buffer);
+        this._f32 = new Float32Array(50000 * 6);
+        this._u32 = new Uint32Array(this._f32.buffer);
         this.init = false;
 
         /// Time properties
@@ -199,12 +199,12 @@ class CanvasJS extends HTMLCanvasElement {
     // 1. Update Buffers
     updateBuffer(count) {
         const requiredLength = count * 6;
-        const isOverflow = requiredLength > this.f32.length;
+        const isOverflow = requiredLength > this._f32.length;
 
         if (isOverflow) {
             const newSize = Math.ceil(requiredLength * 1.5);
-            this.f32 = new Float32Array(newSize);
-            this.u32 = new Uint32Array(this.f32.buffer);
+            this._f32 = new Float32Array(newSize);
+            this._u32 = new Uint32Array(this._f32.buffer);
         }
         return isOverflow;
     }
@@ -214,10 +214,10 @@ class CanvasJS extends HTMLCanvasElement {
         //
         this.ctx.bindBuffer(this.ctx.ARRAY_BUFFER, this.instanceBuffer);
         if (isOverflow || !this.init) {
-            this.ctx.bufferData(this.ctx.ARRAY_BUFFER, this.f32, this.ctx.DYNAMIC_DRAW);
+            this.ctx.bufferData(this.ctx.ARRAY_BUFFER, this._f32, this.ctx.DYNAMIC_DRAW);
             this.init = true;
         }
-        else this.ctx.bufferSubData(this.ctx.ARRAY_BUFFER, 0, this.f32, 0, count * 6);
+        else this.ctx.bufferSubData(this.ctx.ARRAY_BUFFER, 0, this._f32, 0, count * 6);
 
         //
         this.ext.drawArraysInstancedANGLE(this.ctx.TRIANGLES, 0, 6, count);

@@ -11,8 +11,6 @@ class ParticleSystem {
         this.buffer = new ArrayBuffer(this.length * this.stride * 4); // buffer em bytes brutos (dados: 12, slot: 4 bytes)
         this.f32 = new Float32Array(this.buffer); // datas floats
         this.u32 = new Uint32Array(this.buffer);  // datas uints
-        this._f32 = new Uint32Array(this.length * 6);
-        this._u32 = new Uint32Array(this.length * 6);
     }
 
     // Para "Remover" sem causar Garbage Collector
@@ -51,12 +49,10 @@ class ParticleSystem {
         // Isso é vital, senão o f32 continuaria apontando para o buffer antigo (menor)
         this.f32 = new Float32Array(this.buffer);
         this.u32 = new Uint32Array(this.buffer);
-        this._f32 = new Float32Array(this.length * 6);
-        this._u32 = new Uint32Array(this.length * 6);
     }
 
     // Adiciona um Novo Objeto
-    push({ x, y, speed, mass, friction, restitution, radius, fill, stroke, config }) {
+    push(x, y, speed, mass, friction, restitution, radius, fill, stroke, config) {
         // Se estiver cheio, redimensiona
         if (this.count >= this.length) this.resize();
 
@@ -70,7 +66,6 @@ class ParticleSystem {
         this.f32[offset + 1] = y || 0;
         this.f32[offset + 2] = radius ?? 5;
         this.f32[offset + 3] = stroke?.length || 1;
-
         this.u32[offset + 4] = fill || 0xffffffff;
         this.u32[offset + 5] = stroke?.color || 0x000000ff;
 
@@ -93,48 +88,67 @@ class ParticleSystem {
 
     // Executa Apenas as particulas existentes
     update(canvas) {
+        if (!canvas) return; // verifica se canvas existe
+
+        // Update Buffer canvas
+        const isOverflow = this.length * 6 > canvas._f32.length;
+        if (isOverflow) {
+            canvas._f32 = new Float32Array(Math.ceil(this.length * 12));
+            canvas._u32 = new Uint32Array(canvas._f32.buffer);
+        }
+
+        const { deltaTime, width, height, _f32, _u32 } = canvas;
+        const stride = this.stride;
+        const count = this.count; 
+        const f32 = this.f32; 
+        const u32 = this.u32;
+
         let destOffset = 0;
+        const size = count * stride;
+        for (let offset = 0; offset < size; offset += stride) {
+            // Máscara bitwise para evitar IFs (isStatic)
+            const isStatic = 1 - (u32[offset + 11] & 1);
 
-        const len = this.count * this.stride; // count para apenas particuas concideradas existentes
-        for (let offset = 0; offset < len; offset += this.stride) {
-            // 1. Atualiza Posição dos Objetos
-            const isStatic = 1 - (this.u32[offset + 11] & 1);
-            this.f32[offset + 0] += (this.f32[offset + 6] * canvas.deltaTime) * isStatic;
-            this.f32[offset + 1] += (this.f32[offset + 7] * canvas.deltaTime) * isStatic;
+            // Atualização direta
+            f32[offset + 0] += f32[offset + 6] * deltaTime * isStatic;
+            f32[offset + 1] += f32[offset + 7] * deltaTime * isStatic;
 
-            // 2.
-            // Copia s 6 slots de uma vez (X, Y, Rad, Stk, Fill, StkCol)
-            // subarray + set é otimizado via memcpy no C++ do motor V8
-            if (this.f32[offset + 0] > 0 - this.f32[offset + 2] && this.f32[offset + 0] < canvas.width + this.f32[offset + 2] &&
-                this.f32[offset + 1] > 0 - this.f32[offset + 2] && this.f32[offset + 1] < canvas.height + this.f32[offset + 2] ) {
-                this._f32.set(this.f32.subarray(offset, offset + 6), destOffset);
-                this._u32.set(this.u32.subarray(offset, offset + 6), destOffset);
-                destOffset += 6; // offset destion
+            // Frustum Culling Simplificado
+            if (f32[offset + 0] > -f32[offset + 2] && f32[offset + 0] < width + f32[offset + 2] && f32[offset + 1] > -f32[offset + 2] && f32[offset + 1] < height + f32[offset + 2]) {
+                // Cópia manual é mais rápida que subarray().set() para blocos pequenos (6 slots)
+                _f32[destOffset + 0] = f32[offset + 0]; // x
+                _f32[destOffset + 1] = f32[offset + 1]; // y
+                _f32[destOffset + 2] = f32[offset + 2]; // radius
+                _f32[destOffset + 3] = f32[offset + 3]; // stroke width
+                _u32[destOffset + 4] = u32[offset + 4]; // fill (bitcast via float view)
+                _u32[destOffset + 5] = u32[offset + 5]; // stroke color
+                destOffset += 6
             }
-        };
+        }
 
-        return [this._f32.subarray(0, destOffset), this._u32.subarray(0, destOffset)];
+        return [destOffset, isOverflow];
     }
 }
 
 /// Simulando 1 frame
-const particles = new ParticleSystem(50000); // geran 0 particulas && Grenciador de Particulas
-const canvas = {deltaTime:.0016, width:100, height:100};
+const size = 100000; // 100.000
+const particles = new ParticleSystem(size); // geran 0 particulas && Grenciador de Particulas
+const canvas = { deltaTime: .0016, width: 100, height: 100, _f32: new Float32Array(size * 6), _u32: new Float32Array(size * 6) };
 
 // Warm-up (Aquece o motor V8)
-particles.update(() => null);
+particles.update(canvas);
 
 // Medição com alta precisão
 const start = performance.now();
 
-particles.push({ x: 1 });
-const data = particles.update(canvas);
+particles.push(1);
+particles.update(canvas); // ~.01 ms
 
-const end = performance.now(); // ~.3 ms/-
+const end = performance.now(); // ~.2 ms/-
 
 console.log(`[time]: ${(end - start).toFixed(2)} ms`);
 console.log(`[memory]: ${((process.memoryUsage().heapUsed - inicial) / 10000).toFixed(1)} bytes`);
 console.log(`[count]: ${particles.count}/${particles.length}`);
 
-// <50k | -14.ms |
-//  50k | ~14.ms | ~1.0 bytes | +/-Complexo
+// <100k | -2.ms |
+//  100k | ~2.ms | ~1.0 bytes | +/-Complexo

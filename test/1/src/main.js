@@ -1,7 +1,7 @@
 /// main.js
 //
 /// Incializations
-//
+// Canvas
 const canvas = document.getElementById('canvas');
 canvas.background = 0x5293e2e2;
 //
@@ -10,13 +10,14 @@ const st = document.getElementById('status');
 //
 // Particle System
 let particles = new ParticleSystem(50000);
+particles.update(canvas); // Warm-up (Aquece o motor V8)
 //
 /// Update Function
 //
 canvas.main = function () {
     /// Updates
     //
-    if (particles.count < particles.length) Array.from({ length: 100 }).forEach(() => {
+    if (particles.count < particles.length) Array.from({ length: 1000 }).forEach(() => {
         particles.push({
             x: canvas.width / 2, 
             y: canvas.height / 2,
@@ -30,16 +31,13 @@ canvas.main = function () {
         })
     });
 
-    const isOverflow = canvas.updateBuffer(particles.length)
-    const [f32, u32] = particles.update(canvas);
-    canvas.f32.set(f32);
-    canvas.u32.set(u32);
+    const [length, isOverflow] = particles.update(canvas);
 
-    st.textContent = `FPS: ${canvas.fps.toFixed(2)} Particles: ${f32.length/6}/${particles.count}`;
+    st.textContent = `FPS: ${canvas.fps.toFixed(2)} Particles: ${length/6}/${particles.count}`;
 
     /// Renderings
     //
-    canvas.dispatchDraw(f32.length/6, isOverflow);
+    canvas.dispatchDraw(length/6, isOverflow);
 };
 //
 /// Start the loop
