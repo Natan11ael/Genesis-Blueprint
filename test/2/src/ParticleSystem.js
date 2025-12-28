@@ -98,14 +98,14 @@ class ParticleSystem {
         }
 
         // Pega variaveis de uso padarao
-        const { deltaTime, width, height, p_f32, p_u32 } = canvas;
+        const { deltaTime, width, height, p_f32, p_u32, l_f32, l_u32 } = canvas;
         const stride = this.stride;
         const count = this.count; 
         const f32 = this.f32; 
         const u32 = this.u32;
 
         // Update particles
-        let destOffset = 0;
+        let p_dest = 0, l_dest = 0;
         const size = count * stride;
         for (let offset = 0; offset < size; offset += stride) {
             // Máscara bitwise para evitar IFs (isStatic)
@@ -119,16 +119,29 @@ class ParticleSystem {
             if (f32[offset + 0] > -f32[offset + 2] && f32[offset + 0] < width + f32[offset + 2] && 
                 f32[offset + 1] > -f32[offset + 2] && f32[offset + 1] < height + f32[offset + 2]) {
                 // Cópia manual é mais rápida que subarray().set() para blocos pequenos (6 slots)
-                p_f32[destOffset + 0] = f32[offset + 0]; // x
-                p_f32[destOffset + 1] = f32[offset + 1]; // y
-                p_f32[destOffset + 2] = f32[offset + 2]; // radius
-                p_f32[destOffset + 3] = f32[offset + 3]; // stroke width
-                p_u32[destOffset + 4] = u32[offset + 4]; // fill (bitcast via float view)
-                p_u32[destOffset + 5] = u32[offset + 5]; // stroke color
-                destOffset += 6;
+                // Points
+                p_f32[p_dest + 0] = f32[offset + 0]; // x
+                p_f32[p_dest + 1] = f32[offset + 1]; // y
+                p_f32[p_dest + 2] = f32[offset + 2]; // radius
+                p_f32[p_dest + 3] = f32[offset + 3]; // stroke width
+                p_u32[p_dest + 4] = u32[offset + 4]; // fill (bitcast via float view)
+                p_u32[p_dest + 5] = u32[offset + 5]; // stroke color
+                // Lines
+                const node = this.i32[offset + 11] * stride;
+                if (node > -1) {
+                    l_f32[l_dest + 0] = f32[offset + 0]; // Início X
+                    l_f32[l_dest + 1] = f32[offset + 1]; // Início Y
+                    l_f32[l_dest + 2] = f32[node + 0];   // Fim X
+                    l_f32[l_dest + 3] = f32[node + 1];   // Fim Y
+                    l_u32[l_dest + 4] = u32[offset + 4]; // Verde Opaco
+                    l_f32[l_dest + 5] = f32[offset + 3]; // Grossura
+                    l_dest += 6;
+                }
+                //
+                p_dest += 6;
             }
         }
 
-        return [destOffset, isOverflow]; // retorna a quantidade de objetos visiveis e se ouve overflow de buffers
+        return [p_dest, isOverflow]; // retorna a quantidade de objetos visiveis e se ouve overflow de buffers
     }
 }

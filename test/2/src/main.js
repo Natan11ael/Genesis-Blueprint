@@ -120,7 +120,7 @@ class CanvasJS extends HTMLCanvasElement {
         // pre-set functions
         this.run = this.run.bind(this);
         this.resize = this.resize.bind(this);
-        this.main = () => null; 
+        this.main = () => null;
         //
         // Loads webgl resources
         this.init();
@@ -363,7 +363,7 @@ class CanvasJS extends HTMLCanvasElement {
         this.lastTime = time;
 
         // Logic and Render
-        this.main();
+        if (canvas.p_f32 || canvas.p_u32 || canvas.l_f32 || canvas.l_u32) this.main();
 
         requestAnimationFrame(this.run); // next frame
     }
@@ -376,25 +376,45 @@ customElements.define('canvas-js', CanvasJS, { extends: 'canvas' }); // Extend H
 const canvas = document.getElementById('canvas');
 canvas.background = 0x000000ff;
 //
+// set particles
+let particles = new ParticleSystem(100);
+//particles.update(canvas); // Warm-up (Aquece o motor V8)
+particles.push({
+    x: canvas.width / 2,
+    y: canvas.height / 2,
+    speed: { x: random({ min: -10, max: 10, type: 'f' }), y: random({ min: -10, max: 10, type: 'f' }) },
+    radius: random({ min: 7, max: 10 }),
+    fill: random({ type: 'h' }),
+    stroke: {length:5},
+});
+particles.push({
+    x: canvas.width / 2,
+    y: canvas.height / 2,
+    speed: { x: random({ min: -10, max: 10, type: 'f' }), y: random({ min: -10, max: 10, type: 'f' }) },
+    radius: random({ min: 7, max: 10 }),
+    fill: random({ type: 'h' }),
+    stroke: {length:5},
+    node: 0,
+});
+//
+// set main
 canvas.main = () => {
-    if (!canvas.p_f32 || !canvas.p_u32 || !canvas.l_f32 || !canvas.l_u32) return;
-    // set data
-    canvas.p_f32[0] = canvas.width / 2; // Centralizado X
-    canvas.p_f32[1] = canvas.height / 2; // Centralizado Y
-    canvas.p_f32[2] = 10.0;             // Raio
-    canvas.p_f32[3] = 1.0;              // Espessura do stroke
-    canvas.p_u32[4] = 0xFF0000FF;       // Vermelho Opaco (RGBA)
-    canvas.p_u32[5] = 0xFF00FFFF;       // Borda Branca
     //
-    canvas.l_f32[0] = 100.0;            // Início X
-    canvas.l_f32[1] = 100.0;            // Início Y
-    canvas.l_f32[2] = 300.0;            // Fim X
-    canvas.l_f32[3] = 300.0;            // Fim Y
-    canvas.l_u32[4] = 0xFF00FF00;       // Verde Opaco
-    canvas.l_f32[5] = 2.0;              // Grossura
+    // Update
+    if (particles.count < particles.length) {
+        particles.push({
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            speed: { x: random({ min: -10, max: 10, type: 'f' }), y: random({ min: -10, max: 10, type: 'f' }) },
+            radius: random({ min: 7, max: 10 }),
+            fill: random({ type: 'h' }),
+        });
+    }
+    const [length, isOverflow] = particles.update(canvas);
+
     //
-    // darw
-    canvas.drawPoints(1);
+    // Render
+    canvas.drawPoints(length);
     canvas.drawLines(1);
 }
 //

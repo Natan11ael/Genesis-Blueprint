@@ -14,6 +14,7 @@ dotenv.config();
 // Cria a instância do aplicativo Express
 const app = express();
 const PORT = process.env.PORT || 3000; // Define a porta. Pega do ambiente (process.env.PORT) ou usa a 3000 como fallback.
+const HOST = process.env.HOST || 'localhost';
 
 /// config
 //
@@ -48,6 +49,6 @@ app.use((req, res, next) => {
 
 /// start server
 //
-app.listen(PORT, () => {
-    console.log(`Servidor rodando em http://localhost:${PORT}`);
+app.listen(PORT, HOST, () => {
+    console.log(`Servidor rodando em http://${HOST}:${PORT}`);
 });
