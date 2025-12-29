@@ -51,7 +51,7 @@ class ParticleSystem {
     }
 
     // Adiciona um Novo Objeto
-    push({x, y, speed, mass, friction, restitution, radius, fill, stroke, node, config}) {
+    push({ x, y, speed, mass, friction, restitution, radius, fill, stroke, node, config }) {
         // Se estiver cheio, redimensiona
         if (this.count >= this.length) this.resize();
 
@@ -86,6 +86,11 @@ class ParticleSystem {
         this.f32[offset + 7] += (fy * dt) * isStatic;
     }
 
+    //
+    isVisible(data, offset, width, height) {
+        return (data[offset + 0] > -data[offset + 2] && data[offset + 0] < width + data[offset + 2] && data[offset + 1] > -data[offset + 2] && data[offset + 1] < height + data[offset + 2]);
+    }
+
     // Executa Apenas as particulas existentes
     update(canvas) {
         if (!canvas) return; // verifica se canvas existe
@@ -100,8 +105,8 @@ class ParticleSystem {
         // Pega variaveis de uso padarao
         const { deltaTime, width, height, p_f32, p_u32, l_f32, l_u32 } = canvas;
         const stride = this.stride;
-        const count = this.count; 
-        const f32 = this.f32; 
+        const count = this.count;
+        const f32 = this.f32;
         const u32 = this.u32;
 
         // Update particles
@@ -116,8 +121,7 @@ class ParticleSystem {
             f32[offset + 1] += f32[offset + 7] * deltaTime * isStatic;
 
             // Frustum Culling Simplificado
-            if (f32[offset + 0] > -f32[offset + 2] && f32[offset + 0] < width + f32[offset + 2] && 
-                f32[offset + 1] > -f32[offset + 2] && f32[offset + 1] < height + f32[offset + 2]) {
+            if (this.isVisible(f32, offset, width, height)) {
                 // Cópia manual é mais rápida que subarray().set() para blocos pequenos (6 slots)
                 // Points
                 p_f32[p_dest + 0] = f32[offset + 0]; // x
@@ -125,23 +129,22 @@ class ParticleSystem {
                 p_f32[p_dest + 2] = f32[offset + 2]; // radius
                 p_f32[p_dest + 3] = f32[offset + 3]; // stroke width
                 p_u32[p_dest + 4] = u32[offset + 4]; // fill (bitcast via float view)
-                p_u32[p_dest + 5] = u32[offset + 5]; // stroke color
-                // Lines
-                const node = this.i32[offset + 11] * stride;
-                if (node > -1) {
-                    l_f32[l_dest + 0] = f32[offset + 0]; // Início X
-                    l_f32[l_dest + 1] = f32[offset + 1]; // Início Y
-                    l_f32[l_dest + 2] = f32[node + 0];   // Fim X
-                    l_f32[l_dest + 3] = f32[node + 1];   // Fim Y
-                    l_u32[l_dest + 4] = u32[offset + 4]; // Verde Opaco
-                    l_f32[l_dest + 5] = f32[offset + 3]; // Grossura
-                    l_dest += 6;
-                }
-                //
+                p_u32[p_dest + 5] = u32[offset + 5]; // stroke color               
                 p_dest += 6;
+            }
+            // Lines
+            const node = this.i32[offset + 11] * stride;
+            if (node > -1 && (this.isVisible(f32, offset, width, height) && this.isVisible(f32, node, width, height))) {
+                l_f32[l_dest + 0] = f32[offset + 0]; // Início X
+                l_f32[l_dest + 1] = f32[offset + 1]; // Início Y
+                l_f32[l_dest + 2] = f32[node + 0];   // Fim X
+                l_f32[l_dest + 3] = f32[node + 1];   // Fim Y
+                l_u32[l_dest + 4] = u32[offset + 4]; // Cor base
+                l_f32[l_dest + 5] = f32[offset + 3]; // Grossura
+                l_dest += 6;
             }
         }
 
-        return [p_dest, isOverflow]; // retorna a quantidade de objetos visiveis e se ouve overflow de buffers
+        return [p_dest, l_dest, isOverflow]; // retorna a quantidade de objetos visiveis e se ouve overflow de buffers
     }
 }

@@ -291,6 +291,15 @@ class CanvasJS extends HTMLCanvasElement {
         this.width = window.innerWidth;
         this.height = window.innerHeight;
         this.#gl.viewport(0, 0, this.width, this.height);
+
+        if (this.p_point) {
+            this.#gl.useProgram(this.p_point);
+            this.#gl.uniform2f(this.u_res_point, this.width, this.height);
+        }
+        if (this.p_line) {
+            this.#gl.useProgram(this.p_line);
+            this.#gl.uniform2f(this.u_res_line, this.width, this.height);
+        }
     }
     //
     // set background color
@@ -324,14 +333,13 @@ class CanvasJS extends HTMLCanvasElement {
         // Get Program | Vao | resolution
         this.#gl.useProgram(this.p_point);
         this.#vao.bindVertexArrayOES(this.vao_point);
-        this.#gl.uniform2f(this.u_res_point, this.width, this.height);
 
         // 
         this.#gl.bindBuffer(this.#gl.ARRAY_BUFFER, this.ibuffer_point);
         this.#gl.bufferSubData(this.#gl.ARRAY_BUFFER, 0, this.p_f32.subarray(0, count * 6));
 
         // 
-        this.#ext.drawArraysInstancedANGLE(this.#gl.TRIANGLE_STRIP, 0, 4, count);
+        this.#ext.drawArraysInstancedANGLE(this.#gl.TRIANGLE_STRIP, 0, 4, count / 6);
         this.#vao.bindVertexArrayOES(null); // Clear link
     }
     //
@@ -341,14 +349,13 @@ class CanvasJS extends HTMLCanvasElement {
         // Get Program | Vao | resolution
         this.#gl.useProgram(this.p_line);
         this.#vao.bindVertexArrayOES(this.vao_line);
-        this.#gl.uniform2f(this.u_res_line, this.width, this.height);
 
         //
         this.#gl.bindBuffer(this.#gl.ARRAY_BUFFER, this.ibuffer_line);
         this.#gl.bufferSubData(this.#gl.ARRAY_BUFFER, 0, this.l_f32.subarray(0, count * 6));
 
         //
-        this.#ext.drawArraysInstancedANGLE(this.#gl.TRIANGLE_STRIP, 0, 4, count);
+        this.#ext.drawArraysInstancedANGLE(this.#gl.TRIANGLE_STRIP, 0, 4, count/6);
         this.#vao.bindVertexArrayOES(null); // Clear link
     }
     //
@@ -379,43 +386,36 @@ canvas.background = 0x000000ff;
 // set particles
 let particles = new ParticleSystem(100);
 //particles.update(canvas); // Warm-up (Aquece o motor V8)
-particles.push({
-    x: canvas.width / 2,
-    y: canvas.height / 2,
-    speed: { x: random({ min: -10, max: 10, type: 'f' }), y: random({ min: -10, max: 10, type: 'f' }) },
-    radius: random({ min: 7, max: 10 }),
-    fill: random({ type: 'h' }),
-    stroke: {length:5},
-});
-particles.push({
-    x: canvas.width / 2,
-    y: canvas.height / 2,
-    speed: { x: random({ min: -10, max: 10, type: 'f' }), y: random({ min: -10, max: 10, type: 'f' }) },
-    radius: random({ min: 7, max: 10 }),
-    fill: random({ type: 'h' }),
-    stroke: {length:5},
-    node: 0,
-});
 //
 // set main
 canvas.main = () => {
     //
     // Update
-    if (particles.count < particles.length) {
-        particles.push({
-            x: canvas.width / 2,
-            y: canvas.height / 2,
-            speed: { x: random({ min: -10, max: 10, type: 'f' }), y: random({ min: -10, max: 10, type: 'f' }) },
-            radius: random({ min: 7, max: 10 }),
-            fill: random({ type: 'h' }),
-        });
-    }
-    const [length, isOverflow] = particles.update(canvas);
+    canvas.countdown('push', .2, () => {
+        if (particles.count < particles.length) {
+            const r = 6;
+            const stk = (particles.length >= 2 && random({ min: 0, max: 1 }));
+            const spd = 10;
+            particles.push({
+                x: canvas.width / 2,
+                y: canvas.height / 2,
+                speed: {
+                    x: random({ min: 0, max: 1 }) ? random({ min: -spd, max: -spd / 2, type: 'f' }) : random({ min: spd / 2, max: spd, type: 'f' }),
+                    y: random({ min: 0, max: 1 }) ? random({ min: -spd, max: -spd / 2, type: 'f' }) : random({ min: spd / 2, max: spd, type: 'f' }),
+                },
+                radius: r,
+                fill: Number(`0xff${random({ type: 'h', digits: 6 })}`),
+                stroke: (stk ? { length: r / 1.5 } : 0),
+                node: (stk ? random({ min: 0, max: particles.length }) : null)
+            });
+        }
+    });
+    const [length, l_count, isOverflow] = particles.update(canvas);
 
     //
     // Render
     canvas.drawPoints(length);
-    canvas.drawLines(1);
+    canvas.drawLines(l_count);
 }
 //
 canvas.run();
